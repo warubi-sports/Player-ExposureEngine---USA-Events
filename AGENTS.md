@@ -1,6 +1,3 @@
-@~/.claude/CLAUDE.md
-@~/.claude/ECOSYSTEM.md
-
 # Exposure Engine
 
 ## About
