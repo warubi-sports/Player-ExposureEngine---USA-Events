@@ -1,8 +1,12 @@
 name: Claude Code
 
+# claude-review is ADVISORY since 2026-10-03 (removed from required checks; Herbert "you decide", Codex think GO WITH FOLDS).
+# It tries up to 4 Claude subscription accounts in turn (secrets CLAUDE_CODE_OAUTH_TOKEN, _2, _3, _4 - set them with
+# ~/bin/review-robot-fix). Drafts are skipped; a newer push cancels the running review of the same PR.
+
 on:
   pull_request:
-    types: [opened, synchronize]
+    types: [opened, synchronize, ready_for_review]
   issue_comment:
     types: [created]
   pull_request_review_comment:
@@ -12,8 +16,12 @@ on:
 
 jobs:
   claude-review:
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
     runs-on: ubuntu-latest
+    timeout-minutes: 45
+    concurrency:
+      group: claude-review-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
     permissions:
       contents: read
       pull-requests: write
@@ -26,15 +34,147 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Run Claude Code Review
+      - name: Find configured account slots
+        id: accounts
+        env:
+          TOKEN_1: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          TOKEN_2: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN_2 }}
+          TOKEN_3: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN_3 }}
+          TOKEN_4: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN_4 }}
+        run: |
+          python3 - <<'PY'
+          import os
+          with open(os.environ["GITHUB_OUTPUT"], "a") as out:
+              for slot in range(1, 5):
+                  configured = bool(os.environ.get("TOKEN_" + str(slot)))
+                  out.write("slot_" + str(slot) + "=" + str(configured).lower() + "\n")
+          PY
+
+      - name: Prepare account 1
+        id: prepare_1
+        if: ${{ success() && steps.accounts.outputs.slot_1 == 'true' }}
+        run: python3 .github/scripts/claude-review-result.py prepare
+
+      - name: Review with account 1
+        id: review_1
+        if: ${{ success() && steps.accounts.outputs.slot_1 == 'true' && steps.prepare_1.outcome == 'success' }}
+        continue-on-error: true
         uses: anthropics/claude-code-action@v1
         with:
+          # Use the job-scoped token with the existing permissions.
+          github_token: ${{ github.token }}
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
             Review this PR for bugs, security issues, and code quality problems.
             Also flag significant simplification opportunities - duplicated logic, unnecessary complexity, or code that could be reused.
             Focus on real issues - not style preferences.
             Be concise. Only comment if you find something worth flagging.
+
+      - name: Check account 1 result
+        id: result_1
+        if: ${{ !cancelled() }}
+        env:
+          CONFIGURED: ${{ steps.accounts.outputs.slot_1 }}
+          OUTCOME: ${{ steps.review_1.outcome }}
+        run: python3 .github/scripts/claude-review-result.py check
+
+      - name: Prepare account 2
+        id: prepare_2
+        if: ${{ !cancelled() && steps.result_1.outputs.state == 'quota' && steps.accounts.outputs.slot_2 == 'true' }}
+        run: python3 .github/scripts/claude-review-result.py prepare
+
+      - name: Review with account 2
+        id: review_2
+        if: ${{ !cancelled() && steps.result_1.outputs.state == 'quota' && steps.accounts.outputs.slot_2 == 'true' && steps.prepare_2.outcome == 'success' }}
+        continue-on-error: true
+        uses: anthropics/claude-code-action@v1
+        with:
+          # Use the job-scoped token with the existing permissions.
+          github_token: ${{ github.token }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN_2 }}
+          prompt: |
+            Review this PR for bugs, security issues, and code quality problems.
+            Also flag significant simplification opportunities - duplicated logic, unnecessary complexity, or code that could be reused.
+            Focus on real issues - not style preferences.
+            Be concise. Only comment if you find something worth flagging.
+
+      - name: Check account 2 result
+        id: result_2
+        if: ${{ !cancelled() && steps.result_1.outputs.state == 'quota' }}
+        env:
+          CONFIGURED: ${{ steps.accounts.outputs.slot_2 }}
+          OUTCOME: ${{ steps.review_2.outcome }}
+        run: python3 .github/scripts/claude-review-result.py check
+
+      - name: Prepare account 3
+        id: prepare_3
+        if: ${{ !cancelled() && steps.result_2.outputs.state == 'quota' && steps.accounts.outputs.slot_3 == 'true' }}
+        run: python3 .github/scripts/claude-review-result.py prepare
+
+      - name: Review with account 3
+        id: review_3
+        if: ${{ !cancelled() && steps.result_2.outputs.state == 'quota' && steps.accounts.outputs.slot_3 == 'true' && steps.prepare_3.outcome == 'success' }}
+        continue-on-error: true
+        uses: anthropics/claude-code-action@v1
+        with:
+          # Use the job-scoped token with the existing permissions.
+          github_token: ${{ github.token }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN_3 }}
+          prompt: |
+            Review this PR for bugs, security issues, and code quality problems.
+            Also flag significant simplification opportunities - duplicated logic, unnecessary complexity, or code that could be reused.
+            Focus on real issues - not style preferences.
+            Be concise. Only comment if you find something worth flagging.
+
+      - name: Check account 3 result
+        id: result_3
+        if: ${{ !cancelled() && steps.result_2.outputs.state == 'quota' }}
+        env:
+          CONFIGURED: ${{ steps.accounts.outputs.slot_3 }}
+          OUTCOME: ${{ steps.review_3.outcome }}
+        run: python3 .github/scripts/claude-review-result.py check
+
+      - name: Prepare account 4
+        id: prepare_4
+        if: ${{ !cancelled() && steps.result_3.outputs.state == 'quota' && steps.accounts.outputs.slot_4 == 'true' }}
+        run: python3 .github/scripts/claude-review-result.py prepare
+
+      - name: Review with account 4
+        id: review_4
+        if: ${{ !cancelled() && steps.result_3.outputs.state == 'quota' && steps.accounts.outputs.slot_4 == 'true' && steps.prepare_4.outcome == 'success' }}
+        continue-on-error: true
+        uses: anthropics/claude-code-action@v1
+        with:
+          # Use the job-scoped token with the existing permissions.
+          github_token: ${{ github.token }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN_4 }}
+          prompt: |
+            Review this PR for bugs, security issues, and code quality problems.
+            Also flag significant simplification opportunities - duplicated logic, unnecessary complexity, or code that could be reused.
+            Focus on real issues - not style preferences.
+            Be concise. Only comment if you find something worth flagging.
+
+      - name: Check account 4 result
+        id: result_4
+        if: ${{ !cancelled() && steps.result_3.outputs.state == 'quota' }}
+        env:
+          CONFIGURED: ${{ steps.accounts.outputs.slot_4 }}
+          OUTCOME: ${{ steps.review_4.outcome }}
+        run: python3 .github/scripts/claude-review-result.py check
+
+      - name: Report whether a review happened
+        if: ${{ !cancelled() }}
+        env:
+          RESULTS: ${{ steps.result_1.outputs.state }} ${{ steps.result_2.outputs.state }} ${{ steps.result_3.outputs.state }} ${{ steps.result_4.outputs.state }}
+        run: |
+          python3 - <<'PY'
+          import os
+          states = os.environ["RESULTS"].split()
+          if "failed" in states or "complete" not in states:
+              raise SystemExit("NOT REVIEWED: no Claude account could review this PR (out of room or key not working). "
+                               "This check is advisory and does not block merging. Renew keys with ~/bin/review-robot-fix.")
+          print("A genuine Claude review completed successfully.")
+          PY
 
   claude-respond:
     if: |
