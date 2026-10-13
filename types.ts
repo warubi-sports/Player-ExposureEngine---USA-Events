@@ -193,3 +193,16 @@ export interface AnalysisResult {
   funnelAnalysis: FunnelAnalysis; // New field for Pain Point #3
   benchmarkAnalysis: BenchmarkMetric[]; // New field for Phase 2 (Reality Check)
 }
+
+export interface SchoolMode {
+  name: string;
+  shortName: string;
+  primaryColor: string;
+  secondaryColor: string;
+  crestUrl: string | null;
+  showcase: {
+    state: 'open' | 'full' | 'not_open';
+    date: string | null;
+    registerUrl: string | null;
+  };
+}
