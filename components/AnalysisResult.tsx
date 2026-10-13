@@ -438,7 +438,7 @@ const AnalysisResultView: React.FC<Props> = ({ result, profile, onReset, isDark,
                 Your path to {school.name}
               </h2>
               <p className="mt-2 text-sm text-slate-600 dark:text-slate-300 print:text-slate-700">
-                This is a Warubi self-assessment based on the information you provided. It is not a decision by {school.shortName}.
+                Warubi prepared this check from your answers. {school.shortName} coaches see players in person at their ID showcase.
               </p>
             </div>
           </div>
@@ -1063,7 +1063,7 @@ const AnalysisResultView: React.FC<Props> = ({ result, profile, onReset, isDark,
                   ? `The school's ID showcase is open for registration${showcaseDate ? ` on ${showcaseDate}` : ''}.`
                   : showcase?.state === 'full'
                     ? `Registration is full${showcaseDate ? ` for ${showcaseDate}` : ''}.`
-                    : 'Registration is not open. No open showcase date is available.'}
+                    : 'The next date is being set.'}
               </p>
               {showcase?.state === 'open' && showcase.registerUrl && (
                 <a href={showcase.registerUrl} target="_blank" rel="noopener noreferrer"

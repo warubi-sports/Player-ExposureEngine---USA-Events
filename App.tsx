@@ -250,7 +250,7 @@ const App: React.FC = () => {
                  style={{ borderColor: school.primaryColor }}>
                  <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: school.primaryColor }}>Player check by Warubi</p>
                  <p className="mt-1 text-lg font-bold">Your path to {school.name}</p>
-                 <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Your answers create a Warubi self-assessment, not a decision by {school.shortName}.</p>
+                 <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Warubi prepares this check from your answers. {school.shortName} coaches see players in person at their ID showcase.</p>
                </div>
              )}
              <div className="text-center mb-10">
