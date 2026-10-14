@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
-import { AnalysisResult, RiskFlag, ActionItem, PlayerProfile, BenchmarkMetric } from '../types';
+import { AnalysisResult, RiskFlag, ActionItem, PlayerProfile, BenchmarkMetric, SchoolMode } from '../types';
+import { chooseSchoolStep, showEstimatedCaliber } from '../lib/school-mode.js';
 // supabase imported dynamically in handleEmailSubmit to reduce chunk size
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
@@ -18,6 +19,7 @@ interface Props {
   profile: PlayerProfile;
   onReset: () => void;
   isDark: boolean;
+  school?: SchoolMode | null;
 }
 
 const PrintHeader = ({ profile }: { profile: PlayerProfile }) => {
@@ -48,7 +50,7 @@ const PrintFooter = () => (
   </div>
 );
 
-const AnalysisResultView: React.FC<Props> = ({ result, profile, onReset, isDark }) => {
+const AnalysisResultView: React.FC<Props> = ({ result, profile, onReset, isDark, school }) => {
   const [viewMode, setViewMode] = useState<'player' | 'coach'>('player');
   
   // Email Modal State
@@ -394,11 +396,55 @@ const AnalysisResultView: React.FC<Props> = ({ result, profile, onReset, isDark 
   };
 
   const athleticCeiling = getAthleticCeiling(readinessScore.athletic);
+  const schoolStep = school ? chooseSchoolStep(readinessScore) : null;
+  const stepDetails = schoolStep === 'fc-koln-itp'
+    ? {
+        title: 'FC Köln ITP',
+        description: 'Develop for a season in the FC Köln ITP training environment.',
+        url: profile.gender === 'Female'
+          ? 'https://warubi-sports.com/fccologne-itp-women/'
+          : 'https://warubi-sports.com/fc-cologne-soccer-academy/',
+      }
+    : schoolStep === 'european-club-pathway'
+      ? {
+          title: 'European club pathway',
+          description: 'Explore club football in Europe based on your current level.',
+          // TODO: Link a dedicated European club pathway page when it is published.
+          url: null,
+        }
+      : {
+          title: 'Warubi Verified',
+          description: 'One option: Copa Score testing in the US, then Warubi Combine testing days in Cologne, to build a verified player record.',
+          // TODO: Link the dedicated Warubi Verified page when it is published.
+          url: null,
+        };
+  const showcase = school?.showcase;
+  const showcaseDate = showcase?.date
+    ? new Date(`${showcase.date}T12:00:00`).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+    : null;
 
   return (
     <div ref={contentRef} className="w-full animate-fade-in print:p-0">
       <PrintHeader profile={profile} />
       <PrintFooter />
+
+      {school && (
+        <section data-pdf-section className="mb-6 overflow-hidden rounded-2xl border border-b-2 border-slate-200 bg-white dark:border-white/10 dark:bg-slate-900 print:bg-white"
+          style={{ borderTop: `5px solid ${school.primaryColor}`, borderBottomColor: school.secondaryColor }}>
+          <div className="flex items-center gap-4 p-5 sm:p-7">
+            {school.crestUrl && <img src={school.crestUrl} alt="" className="h-14 w-14 shrink-0 object-contain" />}
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: school.primaryColor }}>Player check by Warubi</p>
+              <h2 className="mt-1 text-2xl font-bold leading-tight text-slate-900 dark:text-white sm:text-3xl print:text-slate-900">
+                Your path to {school.name}
+              </h2>
+              <p className="mt-2 text-sm text-slate-600 dark:text-slate-300 print:text-slate-700">
+                Warubi prepared this check from your answers. {school.shortName} coaches see players in person at their ID showcase.
+              </p>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* PDF Generation Overlay */}
       {isGeneratingPDF && (
@@ -543,7 +589,7 @@ const AnalysisResultView: React.FC<Props> = ({ result, profile, onReset, isDark 
           </div>
 
           {/* Estimated Caliber Score */}
-          {estimatedCaliber && (
+          {estimatedCaliber && showEstimatedCaliber(school) && (
             <div data-pdf-section className="bg-gradient-to-br from-slate-50 to-emerald-50/30 dark:from-slate-900/60 dark:to-emerald-900/10 backdrop-blur-sm p-6 md:p-8 rounded-2xl border border-emerald-200/50 dark:border-emerald-500/10 shadow-lg dark:shadow-xl print:shadow-none print:border-slate-300 print:bg-white">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center">
@@ -1006,6 +1052,42 @@ const AnalysisResultView: React.FC<Props> = ({ result, profile, onReset, isDark 
         </div>
       )}
 
+      {school && (
+        <section data-pdf-section className="mt-8 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-slate-900 sm:p-7 print:bg-white">
+          <h3 className="text-xl font-bold text-slate-900 dark:text-white print:text-slate-900">Your next steps</h3>
+          <div className="mt-5 grid gap-4 sm:grid-cols-2">
+            <div className="rounded-xl border border-slate-200 p-4 dark:border-white/10">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">School showcase</p>
+              <h4 className="mt-1 text-lg font-bold text-slate-900 dark:text-white print:text-slate-900">{school.shortName} ID Showcase</h4>
+              <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-300 print:text-slate-700">
+                {showcase?.state === 'open'
+                  ? (showcaseDate ? `The school's ID showcase is on ${showcaseDate}. Registration is open.` : 'Registration is open.')
+                  : showcase?.state === 'full'
+                    ? `Registration is full${showcaseDate ? ` for ${showcaseDate}` : ''}.`
+                    : 'The next date is being set.'}
+              </p>
+              {showcase?.state === 'open' && showcase.registerUrl && (
+                <a href={showcase.registerUrl} target="_blank" rel="noopener noreferrer"
+                  className="mt-4 inline-flex rounded-lg px-4 py-2 text-sm font-semibold text-white no-print"
+                  style={{ backgroundColor: school.primaryColor }}>Register</a>
+              )}
+            </div>
+            <div className="rounded-xl border border-slate-200 p-4 dark:border-white/10">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Recommended option</p>
+              <h4 className="mt-1 text-lg font-bold text-slate-900 dark:text-white print:text-slate-900">{stepDetails.title}</h4>
+              <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-300 print:text-slate-700">{stepDetails.description}</p>
+              {stepDetails.url ? (
+                <a href={stepDetails.url} target="_blank" rel="noopener noreferrer"
+                  className="mt-4 inline-block text-sm font-semibold underline underline-offset-4 no-print"
+                  style={{ color: school.primaryColor }}>Learn more</a>
+              ) : (
+                <span className="mt-4 inline-block text-sm text-slate-500 no-print">More information coming soon</span>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* TAKE ACTION FOOTER (PDF & EMAIL) */}
       <div className="no-print mt-12 border-t border-slate-200 dark:border-white/5 pt-8">
          <div className="flex flex-col md:flex-row justify-between items-center bg-gradient-to-r from-slate-100 to-slate-200 dark:from-slate-900 dark:to-slate-800 p-6 rounded-2xl border border-slate-300 dark:border-white/10 mb-4">
@@ -1099,7 +1181,7 @@ const AnalysisResultView: React.FC<Props> = ({ result, profile, onReset, isDark 
       )}
 
       {/* MOBILE STICKY FOOTER CTA */}
-      <div className="no-print fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-r from-emerald-600 to-emerald-500 backdrop-blur-md border-t border-emerald-400/30 md:hidden z-50 animate-slide-up shadow-2xl shadow-emerald-900/30">
+      {!school && <div className="no-print fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-r from-emerald-600 to-emerald-500 backdrop-blur-md border-t border-emerald-400/30 md:hidden z-50 animate-slide-up shadow-2xl shadow-emerald-900/30">
         <a
             href="https://warubi-sports.com/eliteplayer-pathways/"
             target="_blank"
@@ -1114,10 +1196,10 @@ const AnalysisResultView: React.FC<Props> = ({ result, profile, onReset, isDark 
                Get Help <ArrowRight className="w-4 h-4 ml-1" />
             </div>
         </a>
-      </div>
+      </div>}
 
       {/* DESKTOP WARUBI PATHWAYS CTA */}
-      <div className="no-print mt-12 mb-12 relative group cursor-pointer hidden md:block">
+      {!school && <div className="no-print mt-12 mb-12 relative group cursor-pointer hidden md:block">
         <div className="absolute -inset-0.5 bg-gradient-to-r from-emerald-500/20 to-blue-500/20 rounded-2xl blur opacity-0 group-hover:opacity-100 transition duration-500"></div>
         <div className="relative bg-slate-900 border border-white/10 rounded-2xl p-8 md:p-10 flex flex-col md:flex-row items-center justify-between gap-8 overflow-hidden">
             <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
@@ -1143,7 +1225,7 @@ const AnalysisResultView: React.FC<Props> = ({ result, profile, onReset, isDark 
               <ArrowRight className="w-4 h-4 ml-2" />
             </a>
         </div>
-      </div>
+      </div>}
 
       {/* Beta Disclaimer */}
       <div className="no-print mt-8 pb-8 text-center">

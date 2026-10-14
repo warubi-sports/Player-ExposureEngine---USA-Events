@@ -3,9 +3,10 @@ import React, { useState, useEffect, Suspense } from 'react';
 import Header from './components/Header';
 const PlayerInputForm = React.lazy(() => import('./components/PlayerInputForm'));
 const AnalysisResultView = React.lazy(() => import('./components/AnalysisResult'));
-import { PlayerProfile, AnalysisResult } from './types';
+import { PlayerProfile, AnalysisResult, SchoolMode } from './types';
 import { analyzeExposure } from './services/geminiService';
 import { GraduationCap, Users, ShieldCheck, X, Globe, ArrowRight } from 'lucide-react';
+import { isSchoolSlug } from './lib/school-mode.js';
 const FeedbackWidget = React.lazy(() => import('./components/FeedbackWidget').then(m => ({ default: m.FeedbackWidget })));
 
 // Google Analytics gtag type declaration
@@ -100,6 +101,19 @@ const App: React.FC = () => {
     return saved || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
   });
   const [showMethodology, setShowMethodology] = useState(false);
+  const [school, setSchool] = useState<SchoolMode | null>(null);
+
+  // School links are separate from scout referrals and never enter the save path.
+  const [schoolSlug] = useState(() => new URLSearchParams(window.location.search).get('school'));
+  useEffect(() => {
+    if (!isSchoolSlug(schoolSlug)) return;
+    const controller = new AbortController();
+    fetch(`/api/school?slug=${encodeURIComponent(schoolSlug!)}`, { signal: controller.signal })
+      .then(response => response.ok ? response.json() : null)
+      .then(data => { if (data) setSchool(data as SchoolMode); })
+      .catch(() => {}); // Unknown or unavailable schools use the normal evaluation.
+    return () => controller.abort();
+  }, [schoolSlug]);
 
   // Capture referral scout ID from URL (e.g., ?ref=<scoutId>)
   const [referralScoutId] = useState<string | null>(() => {
@@ -231,6 +245,14 @@ const App: React.FC = () => {
 
         {!analysisResult ? (
           <div className="space-y-8 animate-fade-in">
+             {school && (
+               <div className="rounded-xl border-l-4 bg-white p-5 dark:bg-slate-900"
+                 style={{ borderColor: school.primaryColor }}>
+                 <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: school.primaryColor }}>Player check by Warubi</p>
+                 <p className="mt-1 text-lg font-bold">Your path to {school.name}</p>
+                 <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Warubi prepares this check from your answers. {school.shortName} coaches see players in person at their ID showcase.</p>
+               </div>
+             )}
              <div className="text-center mb-10">
                <h2 className="text-3xl md:text-5xl font-bold text-slate-900 dark:text-white mb-4 tracking-tight leading-tight">
                  What level would a college <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-500 to-teal-600 dark:from-emerald-400 dark:to-teal-500">coach put you at today?</span>
@@ -261,7 +283,7 @@ const App: React.FC = () => {
              </Suspense>
 
              {/* Credibility Section */}
-             <div className="mt-24 border-t border-slate-200 dark:border-white/5 pt-12">
+             {!school && <div className="mt-24 border-t border-slate-200 dark:border-white/5 pt-12">
                 <div className="text-center mb-10">
                   <div className="inline-flex items-center justify-center px-3 py-1 rounded-full bg-emerald-100 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold uppercase tracking-widest mb-3">
                     Powered by Warubi Sports
@@ -314,7 +336,7 @@ const App: React.FC = () => {
                     <ArrowRight className="w-4 h-4 ml-2" />
                   </a>
                 </div>
-             </div>
+             </div>}
 
           </div>
         ) : (
@@ -323,7 +345,7 @@ const App: React.FC = () => {
               <div className="animate-spin rounded-full h-8 w-8 border-2 border-emerald-500 border-t-transparent"></div>
             </div>
           }>
-            <AnalysisResultView result={analysisResult} profile={profile!} onReset={handleReset} isDark={theme === 'dark'} />
+            <AnalysisResultView result={analysisResult} profile={profile!} onReset={handleReset} isDark={theme === 'dark'} school={school} />
           </Suspense>
         )}
       </main>
