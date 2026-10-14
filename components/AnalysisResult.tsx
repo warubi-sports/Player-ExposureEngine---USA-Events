@@ -409,11 +409,12 @@ const AnalysisResultView: React.FC<Props> = ({ result, profile, onReset, isDark,
       ? {
           title: 'European club pathway',
           description: 'Explore club football in Europe based on your current level.',
-          url: 'https://warubi-sports.com/how-we-work/',
+          // TODO: Link a dedicated European club pathway page when it is published.
+          url: null,
         }
       : {
           title: 'Warubi Verified',
-          description: 'Start with Copa Score testing in the US, then attend Warubi Combine testing days in Cologne to build a verified player record.',
+          description: 'One option: Copa Score testing in the US, then Warubi Combine testing days in Cologne, to build a verified player record.',
           // TODO: Link the dedicated Warubi Verified page when it is published.
           url: null,
         };
@@ -1060,7 +1061,7 @@ const AnalysisResultView: React.FC<Props> = ({ result, profile, onReset, isDark,
               <h4 className="mt-1 text-lg font-bold text-slate-900 dark:text-white print:text-slate-900">{school.shortName} ID Showcase</h4>
               <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-300 print:text-slate-700">
                 {showcase?.state === 'open'
-                  ? `The school's ID showcase is open for registration${showcaseDate ? ` on ${showcaseDate}` : ''}.`
+                  ? (showcaseDate ? `The school's ID showcase is on ${showcaseDate}. Registration is open.` : 'Registration is open.')
                   : showcase?.state === 'full'
                     ? `Registration is full${showcaseDate ? ` for ${showcaseDate}` : ''}.`
                     : 'The next date is being set.'}
@@ -1072,7 +1073,7 @@ const AnalysisResultView: React.FC<Props> = ({ result, profile, onReset, isDark,
               )}
             </div>
             <div className="rounded-xl border border-slate-200 p-4 dark:border-white/10">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Personal step</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Recommended option</p>
               <h4 className="mt-1 text-lg font-bold text-slate-900 dark:text-white print:text-slate-900">{stepDetails.title}</h4>
               <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-300 print:text-slate-700">{stepDetails.description}</p>
               {stepDetails.url ? (
