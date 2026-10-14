@@ -2,7 +2,7 @@
 // instrumentation, when bundled into a serverless fn that also loads
 // @supabase/supabase-js, crashes the fn at module load. See lib/sentry.ts.
 import { createClient } from '@supabase/supabase-js'
-import { leadSchema } from '../lib/lead-target.js'
+import { checkLeadTarget } from '../lib/lead-target-config.js'
 
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || ''
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || ''
@@ -17,9 +17,10 @@ export default async function handler(req: any, res: any) {
 
   try {
     const start = Date.now()
-    // Same schema as the form (lib/lead-target.js); a bad value lands in the catch below as 'down'.
+    // Same schema as the form (lib/lead-target.js), checked against the URL it is read from (all or none: Core +
+    // itp_hub, or neither); a bad or half-set value lands in the catch below as 'down', before any request.
     const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
-      db: { schema: leadSchema(process.env.VITE_SUPABASE_DB_SCHEMA) as 'public' },
+      db: { schema: checkLeadTarget(SUPABASE_URL, process.env.VITE_SUPABASE_DB_SCHEMA) as 'public' },
     })
     const { count, error } = await supabase
       .from('website_leads')
