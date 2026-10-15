@@ -6,7 +6,7 @@ const AnalysisResultView = React.lazy(() => import('./components/AnalysisResult'
 import { PlayerProfile, AnalysisResult, SchoolMode } from './types';
 import { analyzeExposure } from './services/geminiService';
 import { GraduationCap, Users, ShieldCheck, X, Globe, ArrowRight } from 'lucide-react';
-import { isSchoolSlug } from './lib/school-mode.js';
+import { isSchoolSlug, leadReferralSource } from './lib/school-mode.js';
 const FeedbackWidget = React.lazy(() => import('./components/FeedbackWidget').then(m => ({ default: m.FeedbackWidget })));
 
 // Google Analytics gtag type declaration
@@ -103,7 +103,7 @@ const App: React.FC = () => {
   const [showMethodology, setShowMethodology] = useState(false);
   const [school, setSchool] = useState<SchoolMode | null>(null);
 
-  // School links are separate from scout referrals and never enter the save path.
+  // Confirmed school links tag saved leads; scout referrals stay separate and take priority.
   const [schoolSlug] = useState(() => new URLSearchParams(window.location.search).get('school'));
   useEffect(() => {
     if (!isSchoolSlug(schoolSlug)) return;
@@ -191,7 +191,7 @@ const App: React.FC = () => {
         visibility_scores: Object.fromEntries(
           result.visibilityScores.map((v: any) => [v.level.toLowerCase(), v.visibilityPercent])
         ),
-        referral_source: referralScoutId,
+        referral_source: leadReferralSource(referralScoutId, school ? schoolSlug : null),
       };
       const { supabase } = await import('./services/supabase');
       if (leadData.email) {
