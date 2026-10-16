@@ -14,6 +14,7 @@
     }
   ],
   "rewrites": [
+    { "source": "/api/itp-move-probe", "destination": "/api/itp-move-probe" },
     { "source": "/email/:path*", "destination": "/email/:path*" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
