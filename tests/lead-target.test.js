@@ -52,6 +52,14 @@ test('vite.config.ts runs the guard on every build; browser code never imports i
   assert.deepEqual(importers, []);
 });
 
+test('visitor writes stay within the move grants: the RPC or a plain insert, never a table upsert (needs UPDATE)', () => {
+  const modal = read('components/AnalysisResult.tsx');
+  assert.match(modal, /supabase\.rpc\('upsert_website_lead', \{ lead_data: \{/);
+  for (const path of ['App.tsx', 'components/AnalysisResult.tsx']) {
+    assert.doesNotMatch(read(path), /\.upsert\(/, path);
+  }
+});
+
 test('browser files keep the move build check meaningful: no quoted hub schema, no project address', () => {
   // ws-hub-move scripts/vercel.mjs reads the built assets: exactly one project ref, and a quoted itp_hub that only
   // the inlined VITE_SUPABASE_DB_SCHEMA may bring.
