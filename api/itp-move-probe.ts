@@ -1,4 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { createHash, timingSafeEqual } from 'node:crypto';
 import { resolveItpTarget, itpProfileHeaders, referralPaused } from '../lib/itp-target.js';
 
 function projectRef(url: string | undefined): string | null {
@@ -23,6 +24,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     paused: { referral: referralPaused() },
   };
 
+  const token = process.env.ITP_MOVE_PROBE_TOKEN;
+  const authorization = req.headers?.authorization;
+  // Fixed-size digests keep the secret comparison constant-time across token lengths.
+  if (!token?.trim() || typeof authorization !== 'string' || !timingSafeEqual(
+    createHash('sha256').update(authorization).digest(),
+    createHash('sha256').update(`Bearer ${token}`).digest(),
+  )) {
+    answer.error = 'token_required';
+    return res.status(200).json(answer);
+  }
+
   let target;
   try {
     target = resolveItpTarget(url, key, schemaEnv);
@@ -36,6 +48,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // The same service target as the referral writers; move_phase is read-only.
     const response = await fetch(`${target.url}/rest/v1/rpc/move_phase`, {
       method: 'POST',
+      redirect: 'error',
       headers: {
         'Content-Type': 'application/json',
         apikey: target.key,

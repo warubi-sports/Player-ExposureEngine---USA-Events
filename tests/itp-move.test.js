@@ -40,13 +40,14 @@ const { default: probe } = await import('../api/itp-move-probe.ts');
 const ITP = 'https://umblyhwumtadlvgccdwg.supabase.co';
 const CORE = 'https://wwomwawpxmkrykybpqok.supabase.co';
 const KEY = 'test-service-key-never-return';
+const TOKEN = 'test-probe-token-never-return';
 const SCOUT = '11111111-2222-4333-8444-555555555555';
-const envNames = ['SCOUT_SUPABASE_URL', 'SCOUT_SUPABASE_SERVICE_KEY', 'SCOUT_SUPABASE_DB_SCHEMA', 'ITP_REFERRAL_PAUSED', 'VERCEL_DEPLOYMENT_ID', 'GEMINI_API_KEY'];
+const envNames = ['SCOUT_SUPABASE_URL', 'SCOUT_SUPABASE_SERVICE_KEY', 'SCOUT_SUPABASE_DB_SCHEMA', 'ITP_REFERRAL_PAUSED', 'VERCEL_DEPLOYMENT_ID', 'GEMINI_API_KEY', 'ITP_MOVE_PROBE_TOKEN'];
 let savedEnv, originalFetch, requests, requestId = 0;
 beforeEach(() => {
   savedEnv = Object.fromEntries(envNames.map(name => [name, process.env[name]]));
   envNames.forEach(name => delete process.env[name]);
-  Object.assign(process.env, { SCOUT_SUPABASE_URL: ITP, SCOUT_SUPABASE_SERVICE_KEY: KEY, GEMINI_API_KEY: 'fake-gemini' });
+  Object.assign(process.env, { SCOUT_SUPABASE_URL: ITP, SCOUT_SUPABASE_SERVICE_KEY: KEY, GEMINI_API_KEY: 'fake-gemini', ITP_MOVE_PROBE_TOKEN: TOKEN });
   globalThis.__itpGemini = { constructed: 0, called: 0, result: { plainLanguageSummary: 'test analysis' } };
   originalFetch = globalThis.fetch;
   requests = [];
@@ -73,12 +74,13 @@ async function analysis(body = profile()) {
   await analyze({ method: 'POST', headers: { 'x-forwarded-for': `test-${++requestId}` }, body }, res);
   return res;
 }
-async function runProbe() {
+async function runProbe(authorization = `Bearer ${TOKEN}`) {
   const res = response();
-  await probe({ method: 'GET' }, res);
+  await probe({ method: 'GET', headers: authorization === null ? {} : { authorization } }, res);
   assert.equal(res.statusCode, 200);
   assert.equal(res.headers['Cache-Control'], 'no-store');
   assert.equal(JSON.stringify(res.body).includes(KEY), false);
+  assert.equal(JSON.stringify(res.body).includes(TOKEN), false);
   return res.body;
 }
 const writers = {
@@ -197,6 +199,32 @@ test('unset and any non-true pause value preserve Gemini and referral writes', a
   assert.equal(requests.length, 5);
 });
 
+for (const [mode, url, schema] of [['TODAY', ITP, ''], ['SWITCHED', CORE, 'itp']]) {
+  test(`${mode}: unauthorized probe returns metadata and pause without I/O`, async () => {
+    Object.assign(process.env, { SCOUT_SUPABASE_URL: url, SCOUT_SUPABASE_DB_SCHEMA: schema, VERCEL_DEPLOYMENT_ID: 'dpl_test' });
+    for (const paused of [false, true]) {
+      process.env.ITP_REFERRAL_PAUSED = String(paused);
+      for (const authorization of [null, '', `Bearer ${TOKEN.slice(0, -1)}x`, `Bearer ${TOKEN}extra`, 'Bearer short', 'Bearer ü', TOKEN]) {
+        assert.deepEqual(await runProbe(authorization), {
+          probe: 'itp-move', deployment: 'dpl_test', ref: mode === 'TODAY' ? 'umblyhwumtadlvgccdwg' : 'wwomwawpxmkrykybpqok',
+          schema: schema || 'public', phase: null, error: 'token_required', paused: { referral: paused },
+        });
+        assert.equal(requests.length, 0);
+      }
+      for (const token of [undefined, '', '   ']) {
+        if (token === undefined) delete process.env.ITP_MOVE_PROBE_TOKEN;
+        else process.env.ITP_MOVE_PROBE_TOKEN = token;
+        const body = await runProbe();
+        assert.equal(body.error, 'token_required');
+        assert.equal(body.phase, null);
+        assert.deepEqual(body.paused, { referral: paused });
+        assert.equal(requests.length, 0);
+      }
+      process.env.ITP_MOVE_PROBE_TOKEN = TOKEN;
+    }
+  });
+}
+
 test('legacy probe reads once with its own credentials, returns only the error code', async t => {
   const timeout = t.mock.method(AbortSignal, 'timeout', ms => {
     assert.equal(ms, 8000);
@@ -212,16 +240,17 @@ test('legacy probe reads once with its own credentials, returns only the error c
   assert.equal(requests[0][0], `${ITP}/rest/v1/rpc/move_phase`);
   const { signal, ...options } = requests[0][1];
   assert.ok(signal instanceof AbortSignal);
-  assert.deepEqual(options, { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: KEY, Authorization: `Bearer ${KEY}` }, body: '{}' });
+  assert.deepEqual(options, { method: 'POST', redirect: 'error', headers: { 'Content-Type': 'application/json', apikey: KEY, Authorization: `Bearer ${KEY}` }, body: '{}' });
 });
 test('switched probe returns phase and deployment, never RPC rows or secrets', async () => {
   Object.assign(process.env, { SCOUT_SUPABASE_URL: CORE, SCOUT_SUPABASE_DB_SCHEMA: 'itp', ITP_REFERRAL_PAUSED: ' true ', VERCEL_DEPLOYMENT_ID: 'dpl_test' });
-  globalThis.fetch = async (...args) => { requests.push(args); return Response.json({ phase: 'copying', key: KEY, rows: [{ email: 'private@example.test' }] }); };
+  globalThis.fetch = async (...args) => { requests.push(args); return Response.json({ phase: 'copying', key: KEY, token: TOKEN, rows: [{ email: 'private@example.test' }] }); };
   const body = await runProbe();
   assert.deepEqual(body, { probe: 'itp-move', deployment: 'dpl_test', ref: 'wwomwawpxmkrykybpqok', schema: 'itp', phase: 'copying', error: null, paused: { referral: true } });
   assert.equal(requests.length, 1);
   assert.equal(requests[0][0], `${CORE}/rest/v1/rpc/move_phase`);
   assert.equal(requests[0][1].headers['Content-Profile'], 'itp');
+  assert.equal(requests[0][1].redirect, 'error');
 });
 test('probe unusable targets and missing credentials return target_unusable without fetch', async () => {
   for (const [url, schema] of unusable) {
