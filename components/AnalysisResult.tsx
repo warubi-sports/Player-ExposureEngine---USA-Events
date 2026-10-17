@@ -373,7 +373,9 @@ const AnalysisResultView: React.FC<Props> = ({ result, profile, onReset, isDark,
     setIsEmailSending(true);
     try {
       const { supabase } = await import('../services/supabase');
-      await supabase.from('website_leads').upsert({
+      // Same door as the form (App.tsx upsert_website_lead): a new e-mail inserts these fields, a known one only fills
+      // empty ones. A table upsert (INSERT ... ON CONFLICT DO UPDATE) needs UPDATE, which visitors do not get.
+      await supabase.rpc('upsert_website_lead', { lead_data: {
         email: email,
         first_name: profile.firstName,
         last_name: profile.lastName,
@@ -382,7 +384,7 @@ const AnalysisResultView: React.FC<Props> = ({ result, profile, onReset, isDark,
         visibility_scores: Object.fromEntries(
           result.visibilityScores.map((v: any) => [v.level.toLowerCase(), v.visibilityPercent])
         ),
-      }, { onConflict: 'email' });
+      } });
     } catch (err) {
       console.error('Failed to save email lead', err);
     }
