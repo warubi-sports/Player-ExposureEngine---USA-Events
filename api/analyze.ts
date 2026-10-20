@@ -3,6 +3,7 @@
 // crashes the fn at module load (FUNCTION_INVOCATION_FAILED). See lib/sentry.ts.
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { GoogleGenAI, Type } from '@google/genai';
+import { resolveItpTarget, itpProfileHeaders, referralPaused } from '../lib/itp-target.js';
 
 // System prompt inlined here because Vercel's serverless bundler can't resolve
 // cross-directory TypeScript imports from the Vite project root.
@@ -517,6 +518,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  if (referralPaused() && UUID_RE.test(req.body?.referralScoutId)) {
+    res.setHeader('Retry-After', '3600');
+    return res.status(503).json({ error: 'Scout referrals are paused for maintenance. Please try again in an hour.' });
+  }
+
   // Rate limit by IP
   const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim()
     || req.socket?.remoteAddress
@@ -638,6 +644,14 @@ async function createScoutProspect(profile: any, result: any): Promise<void> {
     return;
   }
 
+  let target;
+  try {
+    target = resolveItpTarget(url, serviceKey, process.env.SCOUT_SUPABASE_DB_SCHEMA);
+  } catch {
+    console.warn('Scout referral: target_unusable');
+    return;
+  }
+
   const visScores = Array.isArray(result.visibilityScores) ? result.visibilityScores : [];
   const sorted = [...visScores].sort((a: any, b: any) => b.visibilityPercent - a.visibilityPercent);
   const bestLevel = sorted[0]?.level || null;
@@ -699,13 +713,14 @@ async function createScoutProspect(profile: any, result: any): Promise<void> {
     notes: `Via Exposure Engine. Best fit: ${bestLevel} at ${bestScore}%`,
   };
 
-  const response = await fetch(`${url}/rest/v1/scout_prospects`, {
+  const response = await fetch(`${target.url}/rest/v1/scout_prospects`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      apikey: serviceKey,
-      Authorization: `Bearer ${serviceKey}`,
+      apikey: target.key,
+      Authorization: `Bearer ${target.key}`,
       Prefer: 'return=minimal',
+      ...itpProfileHeaders(target, 'POST'),
     },
     body: JSON.stringify(prospect),
   });

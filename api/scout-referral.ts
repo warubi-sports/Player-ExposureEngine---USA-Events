@@ -1,4 +1,5 @@
 import '../lib/sentry';
+import { resolveItpTarget, itpProfileHeaders } from '../lib/itp-target.js';
 /**
  * Scout Referral - Creates a prospect in the scout's pipeline
  * when a player completes an Exposure Engine analysis via ?ref=<scoutId>
@@ -43,6 +44,14 @@ export async function createScoutProspect(profile: any, result: any): Promise<vo
   const serviceKey = process.env.SCOUT_SUPABASE_SERVICE_KEY;
   if (!url || !serviceKey) {
     console.warn('Scout referral: missing SCOUT_SUPABASE_URL or SCOUT_SUPABASE_SERVICE_KEY');
+    return;
+  }
+
+  let target;
+  try {
+    target = resolveItpTarget(url, serviceKey, process.env.SCOUT_SUPABASE_DB_SCHEMA);
+  } catch {
+    console.warn('Scout referral: target_unusable');
     return;
   }
 
@@ -110,13 +119,14 @@ export async function createScoutProspect(profile: any, result: any): Promise<vo
     notes: `Via Exposure Engine. Best fit: ${bestLevel} at ${bestScore}%`,
   };
 
-  const response = await fetch(`${url}/rest/v1/scout_prospects`, {
+  const response = await fetch(`${target.url}/rest/v1/scout_prospects`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      apikey: serviceKey,
-      Authorization: `Bearer ${serviceKey}`,
+      apikey: target.key,
+      Authorization: `Bearer ${target.key}`,
       Prefer: 'return=minimal',
+      ...itpProfileHeaders(target, 'POST'),
     },
     body: JSON.stringify(prospect),
   });
