@@ -9,8 +9,8 @@ AI-powered visibility calculator for elite youth soccer players targeting US col
 - Region: us-east-1
 
 ## Vercel
-- App: exposureengine
-- URL: https://exposure-engine.vercel.app
+- App: exposure-engine
+- URL: https://app.warubi-sports.com (production; checked 2026-11-13: it serves a Vite build with this repository's page title). Do not check a deploy on https://exposure-engine.vercel.app: on that day it served a different, Next.js page.
 - Project ID: prj_FcZ0vQHYmOPcphy4knv8Peocq0nI
 
 ## Stack
@@ -30,7 +30,7 @@ AI-powered visibility calculator for elite youth soccer players targeting US col
 - `services/supabase.ts` — Supabase client (fire-and-forget lead saves)
 - `types.ts` — All TypeScript interfaces
 - `constants.ts` — Leagues, positions, levels, athletic ratings
-- `api/` also contains `feedback.ts`, `health.ts`, `school.ts`, `scout-referral.ts` and `itp-move-probe.ts`. `lib/` contains lead-target, ITP-target and school-mode helpers; `tests/` covers these helpers and related routes. Run these tests with `npm test` (`node --test tests/*.test.js`).
+- `api/` also contains `feedback.ts`, `health.ts`, `school.ts`, `scout-referral.ts` and `itp-move-probe.ts`. `lib/` contains lead-target, ITP-target and school-mode helpers plus `sentry.ts`; `tests/` covers these helpers and related routes. Run these tests with `npm test` (`node --test tests/*.test.js`).
 
 ## Key Tables
 - `website_leads` — Player submissions + analysis results (upsert by email)
