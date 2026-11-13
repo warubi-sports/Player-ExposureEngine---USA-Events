@@ -16,10 +16,13 @@ type PublicShowcase = {
   registration_count: number | null;
 };
 
-async function publicRpc<T>(url: string, key: string, name: string, body: object): Promise<T | null> {
+async function publicRpc<T>(url: string, key: string, name: string, body: object, schema?: string): Promise<T | null> {
   const response = await fetch(`${url.replace(/\/$/, '')}/rest/v1/rpc/${name}`, {
     method: 'POST',
-    headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+    headers: {
+      apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json',
+      ...(schema ? { 'Content-Profile': schema } : {}),
+    },
     body: JSON.stringify(body),
   });
   if (!response.ok) throw new Error(`${name} returned ${response.status}`);
@@ -47,6 +50,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const myseasonUrl = process.env.MYSEASON_SUPABASE_URL;
   const myseasonKey = process.env.MYSEASON_SUPABASE_ANON_KEY;
+  const myseasonSchema = process.env.MYSEASON_DB_SCHEMA?.trim();
   const coreUrl = process.env.WARUBI_CORE_SUPABASE_URL;
   const coreKey = process.env.WARUBI_CORE_SUPABASE_ANON_KEY;
   if (!myseasonUrl || !myseasonKey || !coreUrl || !coreKey) {
@@ -55,7 +59,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const school = await publicRpc<PublicSchool>(myseasonUrl, myseasonKey,
-      'get_myseason_public_school_v1', { p_slug: slug });
+      'get_myseason_public_school_v1', { p_slug: slug }, myseasonSchema);
     if (!school || school.slug !== slug) return res.status(404).json({ error: 'School not found' });
 
     // This is the same public availability RPC used by My Season's register page.

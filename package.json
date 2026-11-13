@@ -4,6 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "test:my-season-move": "node --test tests/my-season-move.test.js",
     "dev": "vercel dev",
     "dev:vite": "vite",
     "build": "vite build",
