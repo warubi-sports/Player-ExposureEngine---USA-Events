@@ -23,13 +23,14 @@ AI-powered visibility calculator for elite youth soccer players targeting US col
 
 ## Key Files
 - `App.tsx` — Main layout, theme state, analysis orchestration
-- `components/PlayerInputForm.tsx` — Multi-section form (62KB), localStorage autosave, demo data
-- `components/AnalysisResult.tsx` — Results dashboard (62KB), Player/Coach view toggle, PDF export
-- `api/analyze.ts` — Vercel serverless function with Gemini system prompt (26KB)
+- `components/PlayerInputForm.tsx` contains the multi-section form, localStorage autosave and demo data. Read this large file in parts.
+- `components/AnalysisResult.tsx` contains the results dashboard, Player/Coach view toggle and PDF export. Read this large file in parts.
+- `api/analyze.ts` contains the Vercel serverless function with the Gemini system prompt. Read this large file in parts.
 - `services/geminiService.ts` — Client-side Gemini integration + deterministic readiness calc
 - `services/supabase.ts` — Supabase client (fire-and-forget lead saves)
 - `types.ts` — All TypeScript interfaces
 - `constants.ts` — Leagues, positions, levels, athletic ratings
+- `api/` also contains `feedback.ts`, `health.ts`, `school.ts`, `scout-referral.ts` and `itp-move-probe.ts`. `lib/` contains lead-target, ITP-target and school-mode helpers; `tests/` covers these helpers and related routes. Run these tests with `npm test` (`node --test tests/*.test.js`).
 
 ## Key Tables
 - `website_leads` — Player submissions + analysis results (upsert by email)
